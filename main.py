@@ -4,6 +4,7 @@ from os import environ
 from pymongo.mongo_client import MongoClient
 from fastapi import FastAPI
 app = FastAPI()
+from bson.json_util import dumps
 
 MONGO_USERNAME = environ.get("MONGO_USERNAME")
 MONGO_PASSWORD = environ.get("MONGO_PASSWORD")
@@ -17,14 +18,13 @@ collection = db.ghosts
 
 @app.get("/")
 def index():
-    return {"Message": "Welcome to: Phasmophobia Ghost Counter\nUse /redoc to check avaiable endpoints"}
+    return {"Message": "Welcome to: Phasmophobia Ghost Counter. Use /redoc to check avaiable endpoints"}
 
 @app.get("/inc/{ghost}")
 async def inc_ghost(ghost):
     if ghost in ghosts:
         collection.update_one({"ghost": ghost}, {"$inc": {"count": 1}})
-        allGhosts = collection.find({})
-        data = [x for x in allGhosts]
+        data = dumps(collection.find())
         return data
     else:
         return {"message": f"Wrong Ghost: {ghost}"}
@@ -33,8 +33,8 @@ async def inc_ghost(ghost):
 def dec_ghost(ghost: str):
     if ghost in ghosts: 
         collection.update_one({"ghost": ghost}, {"$inc": {"count": -1}})
-        allGhosts = collection.find({})
-        data = [x for x in allGhosts]
+        data = dumps(collection.find())
+        
         return data
     else:
         return {"message": f"Wrong Ghost: {ghost}"}
