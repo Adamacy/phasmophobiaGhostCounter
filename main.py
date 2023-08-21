@@ -2,9 +2,7 @@ from dotenv import load_dotenv
 load_dotenv()
 from os import environ
 from pymongo.mongo_client import MongoClient
-from pprint import pprint
-from fastapi import FastAPI, Response
-
+from fastapi import FastAPI
 app = FastAPI()
 
 MONGO_USERNAME = environ.get("MONGO_USERNAME")
