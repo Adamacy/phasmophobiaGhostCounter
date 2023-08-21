@@ -15,10 +15,24 @@ client = MongoClient(MONGO_URI)
 db = client.phasmophobia
 collection = db.ghosts
 
-@app.get("/ghosts/{ghost}")
-async def update_count(ghost):
+@app.get("/")
+def index():
+    return {"Message": "Welcome to: Phasmophobia Ghost Counter\nUse /redoc to check avaiable endpoints"}
+
+@app.get("/inc/{ghost}")
+async def inc_ghost(ghost):
     if ghost in ghosts:
         collection.update_one({"ghost": ghost}, {"$inc": {"count": 1}})
+        allGhosts = collection.find({})
+        data = [x for x in allGhosts]
+        return data
+    else:
+        return {"message": f"Wrong Ghost: {ghost}"}
+
+@app.get("/dec/{ghost}")
+def dec_ghost(ghost: str):
+    if ghost in ghosts: 
+        collection.update_one({"ghost": ghost}, {"$inc": {"count": -1}})
         allGhosts = collection.find({})
         data = [x for x in allGhosts]
         return data
