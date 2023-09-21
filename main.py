@@ -6,9 +6,18 @@ from pymongo.mongo_client import MongoClient
 from os import environ
 from dotenv import load_dotenv
 from google.oauth2 import service_account
+import tkinter as tk
+from PIL import ImageTk, Image
 
 load_dotenv()
 
+overlay = tk.Toplevel()
+overlay.overrideredirect(True)
+overlay.attributes("-topmost", True)
+
+overlay_width = 250
+overlay_height = 150
+overlay.geometry(f"{overlay_width}x{overlay_height}")
 # GCloud config
 credentials = service_account.Credentials.from_service_account_file("private-key.json")
 
@@ -29,109 +38,91 @@ test_collection = db.test_ghosts
 
 class Phasmophobia:
     def __init__(self) -> None:
+        
         self.finished = False
-        self.phasmophobia_running = False
-        self.notebookOpen = False
         self.isGameRunning()
+        self.notebookOpen = False
+        if self.phasmophobia_running:
+            self.img = ImageTk.PhotoImage(Image.open("guess.png"))
+            self.label = tk.Label(overlay, image=self.img)
+            print("Game's running ")
+            self.checkIfFinished()
+            self.checkIfNotebookOpen()
+            sleep(0.8)
 
     def isGameRunning(self):
         try:
             phasmo = gw.getWindowsWithTitle("Phasmophobia")[0]
             if phasmo:
                 self.phasmophobia_running = True
-                print("Running")
-                sleep(0.5)
-                self.checkIfFinished()
-                self.checkIfNotebookOpen()
-                self.isGameRunning()
-
         except IndexError:
             print("Game is not launched")
             self.phasmophobia_running = False
             sleep(2)
             self.isGameRunning()
+            
 
     def getGhostType(self, location):
         screenshot(
-            "toRead.png", (location.left + location.width, location.top, 250, 80)
+            "toRead.png", (location.left + location.width, location.top, 260, 80)
         )
-        data = pytesseract.image_to_string("toRead.png").strip()
-
-        match data:
-            case "Weaith":
-                data = "Wraith"
-            case "Spicit":
-                data = "Spirit"
-            case "Tian":
-                data = "Jinn"
-            case "Tina":
-                data = "Jinn"
-            case "Demen":
-                data = "Demon"
-            case "Yarei":
-                data = "Yurei"
-            case "Hontu":
-                data = "Hantu"
-            case "Myting":
-                data = "Myling"
-            case "Rai ja":
-                data = "Raiju"
-            case "Oboke.":
-                data = "Obake"
-            case "Oncyo":
-                data = "Onryo"
-            case "Oboke":
-                data = "Obake"
-            case "The Minnie.":
-                data = "The Mimic"
-            case "The Minnie":
-                data = "The Mimic"
-            case "Mace":
-                data = "Mare"
-            case "Morai":
-                data = "Moroi"
-            case "M ora:":
-                data = "Moroi"
+        data = self.readSelectedGhostFromImage("toRead.png").strip()
 
         collection.update_one({"ghost": data}, {"$inc": {"count": 1}})
-        selected_ghost = self.readSelectedGhostFromImage()
-        if selected_ghost == data:
-            test_collection.update_one({"ghost": data}, {"$inc": {"gamesPlayed": 1}})
-            test_collection.update_one({"ghost": data}, {"$inc": {"correctGuesses": 1}})
-        else:
-            test_collection.update_one({"ghost": data}, {"$inc": {"gamesPlayed": 1}})
-            test_collection.update_one({"ghost": data}, {"$inc": {"correctGuesses": 0}})
+        selected_ghost = self.readSelectedGhostFromImage("guess.png").strip()
+        match data:
+            case "Raija":
+                data = "Raiju"
+            case "Deman":
+                data = "Demon"
+            case "Morai":
+                data = "Moroi"
+        match selected_ghost:
+            case "Deman":
+                selected_ghost = "Demon"
+            case "Morai":
+                selected_ghost = "Moroi"
 
+        if selected_ghost == data:
+            test_collection.update_one({"ghostType": data}, {"$inc": {"gamesPlayed": 1}})
+            test_collection.update_one({"ghostType": data}, {"$inc": {"correctGuesses": 1}})
+            print("Guessed")
+        else:
+            test_collection.update_one({"ghostType": data}, {"$inc": {"gamesPlayed": 1}})
+            test_collection.update_one({"ghostType": data}, {"$inc": {"correctGuesses": 0}})
+            print("Not guessed")
         print(data)
         print(selected_ghost)
 
     def checkIfNotebookOpen(self):
         if not self.notebookOpen:
-            notebook = locateOnScreen("evidence.png")
+            notebook = locateOnScreen("evidence.png", confidence=0.6)
             if notebook == None:
                 print("Notebook closed")
             else:
                 print("Notebook opened")
                 try:
                     circle = locateOnScreen("circle.png", confidence=0.4)
+                    print(circle)
                     screenshot(
                         "guess.png",
                         (
                             circle.left + (circle.width - (circle.width - 30)),
                             circle.top + (circle.height - (circle.height - 30)),
-                            120,
-                            28,
+                            170,
+                            37,
                         ),
                     )
+                    sleep(2)
                 except:
                     pass
 
-    def readSelectedGhostFromImage(self):
+    def readSelectedGhostFromImage(self, file):
         from google.cloud import vision
 
         client = vision.ImageAnnotatorClient(credentials=credentials)
 
-        with open("guess.png", "rb") as image_file:
+        with open(file, "rb") as image_file:
             content = image_file.read()
 
         image = vision.Image(content=content)
@@ -146,17 +137,6 @@ class Phasmophobia:
             )
         return texts[0].description
 
-    def getSelectedGhost(self, location):
-        screenshot(
-            "guess.png",
-            (
-                location.left + (location.width - (location.width - 30)),
-                location.top + (location.height - (location.height - 30)),
-                120,
-                28,
-            ),
-        )
-
     def checkIfFinished(self):
         if not self.finished:
             ghostType = locateOnScreen("ghost_type.png", confidence=0.50)
@@ -168,7 +148,9 @@ class Phasmophobia:
                 print("Game finished")
                 self.getGhostType(ghostType)
 
-                sleep(300)
+                for i in range(300):
+                    print(f"Cooldown: {i}")
+                    sleep(1)
 
-
-Phasmophobia()
+while True:
+    Phasmophobia()
